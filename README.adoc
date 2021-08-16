@@ -1,0 +1,7 @@
+# RIF RAP Converters by Flatz
+
+This repository holds copies of Flatz's code for RIF RAP conversion.
+
+* rifkey2rap.c of 2014-09 from http://pastie.org/private/9hjpnaewxg5twytosnx4w
+* rap2rifkey.c of 2012-11-16 from http://pastie.org/private/pmnmsnqg6zbfnk9xactbw
+* rap2rif.c of 2012-11-16 from http://pastie.org/private/yltlfwubsz8w5pyhmojyfg
