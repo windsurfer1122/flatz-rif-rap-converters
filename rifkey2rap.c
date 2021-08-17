@@ -13,7 +13,6 @@ static int klicensee_to_rap(u8 *klicensee, u8 *rap_key);
 
 int main(int argc, char *argv[])
 {
-
 	FILE *fp = NULL;
 
 	u8 rap_key[16];
@@ -31,8 +30,6 @@ int main(int argc, char *argv[])
 		printf("unable to load rif key file.\n");
 		goto fail;
 	}
-
-
 
 	klicensee_to_rap(klicensee, rap_key);
 
@@ -66,6 +63,7 @@ static int load_from_file(const char *path, u8 *data, u32 length)
 	if (read != 1)
 		goto fail;
 	ret = 0;
+
 fail:
 	if (fp != NULL)
 		fclose(fp);
@@ -87,33 +85,38 @@ static int klicensee_to_rap(u8 *klicensee, u8 *rap_key)
 		0x67, 0xD4, 0x5D, 0xA3, 0x29, 0x6D, 0x00, 0x6A, 0x4E, 0x7C, 0x53, 0x7B, 0xF5, 0x53, 0x8C, 0x74
 	};
 
-	int round_num;
-	int i;
-
 	u8 key[16];
-	memset(key, 0, sizeof(key));
 	memcpy(key, klicensee, sizeof(key));
 
-	for (round_num = 0; round_num < 5; ++round_num) {
-		int o = 0;
-		for (i = 0; i < 16; ++i) {
+	for (int round_num = 0; round_num < 5; ++round_num) {
+		// add e2 byte array to key byte array in byte order of pbox array
+		u8 o = 0; // carry over
+		for (int i = 0; i < 16; ++i) {
 			int p = pbox[i];
 			u8 ec2 = e2[p];
+			//
 			u8 kc = key[p] + ec2;
-			key[p] = kc + (u8)o;
+			key[p] = kc + o;
+			// highest result: 0xff + 0xff + 1 = 0xff with a carry over of 1
+			// special case: carry over could cause another carry over only if intermediate result kc is 0xff, then just keep carry over (no change)
+			// otherwise carry over could occur only if intermediate result kc became less than addition value ec2
 			if (o != 1 || kc != 0xFF) {
 				o = kc < ec2 ? 1 : 0;
 			}
 		}
-		for (i = 1; i < 16; ++i) {
+		// xor key byte array with its alternating self shifted by 1 in byte order of pbox array
+		// e.g. xor 2nd key byte in pbox order with 1st key byte in pbox order ([1]<[0],[2]<[1],...,[15]<[14])
+		for (int i = 1; i < 16; ++i) {
 			int p = pbox[i];
 			int pp = pbox[i - 1];
 			key[p] ^= key[pp];
 		}
-		for (i = 0; i < 16; ++i) {
+		// xor key byte array with e1 byte array (order does not matter)
+		for (int i = 0; i < 16; ++i) {
 			key[i] ^= e1[i];
 		}
 	}
+
 	aesecb128_encrypt(rap_initial_key, key, rap_key);
 	return 0;
 }

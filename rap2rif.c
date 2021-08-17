@@ -52,7 +52,7 @@ int main(int argc, char *argv[])
 		goto fail;
 	}
 
-    actdat = actdat_get();
+	actdat = actdat_get();
 	if (actdat == NULL) {
 		fail("unable to load act.dat");
 		goto fail;
@@ -141,6 +141,7 @@ static int load_from_file(const char *path, u8 *data, u32 length)
 	if (read != 1)
 		goto fail;
 	ret = 0;
+
 fail:
 	if (fp != NULL)
 		fclose(fp);
@@ -162,34 +163,34 @@ static int rap_to_klicensee(u8 *rap_key, u8 *klicensee)
 		0x67, 0xD4, 0x5D, 0xA3, 0x29, 0x6D, 0x00, 0x6A, 0x4E, 0x7C, 0x53, 0x7B, 0xF5, 0x53, 0x8C, 0x74
 	};
 
-	int round_num;
-	int i;
-
 	u8 key[16];
 	aes128(rap_initial_key, rap_key, key);
 
-	for (round_num = 0; round_num < 5; ++round_num) {
-		for (i = 0; i < 16; ++i) {
-			int p = pbox[i];
-			key[p] ^= e1[p];
+	for (int round_num = 0; round_num < 5; ++round_num) {
+		// xor key byte array with e1 byte array (order does not matter)
+		for (int i = 0; i < 16; ++i) {
+			key[i] ^= e1[i];
 		}
-		for (i = 15; i >= 1; --i) {
+		// xor key byte array with its alternating self shifted by 1 in reversed byte order of pbox array
+		// e.g. xor 2nd key byte in pbox order with 1st key byte in pbox order ([15]<[14],[14]<[13],...,[1]<[0])
+		for (int i = 15; i >= 1; --i) {
 			int p = pbox[i];
 			int pp = pbox[i - 1];
 			key[p] ^= key[pp];
 		}
-		int o = 0;
-		for (i = 0; i < 16; ++i) {
+		// subtract e2 byte array from key byte array in byte order of pbox array
+		u8 o = 0; // carry over
+		for (int i = 0; i < 16; ++i) {
 			int p = pbox[i];
-			u8 kc = key[p] - o;
 			u8 ec2 = e2[p];
+			//
+			u8 kc = key[p] - o;
+			key[p] = kc - ec2;
+			// lowest result: 0x00 - 1 - 0xff = 0x00 with a carry over of 1
+			// special case: carry over could cause another carry over only if intermediate result kc became 0xff (=0x00 - 1), then just keep carry over (no change)
+			// otherwise carry over could occur only if intermediate result kc is less than subtraction value ec2
 			if (o != 1 || kc != 0xFF) {
 				o = kc < ec2 ? 1 : 0;
-				key[p] = kc - ec2;
-			} else if (kc == 0xFF) {
-				key[p] = kc - ec2;
-			} else {
-				key[p] = kc;
 			}
 		}
 	}
